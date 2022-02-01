@@ -1,5 +1,9 @@
 ARG BASE_IMAGE="ubuntu:focal"
 FROM $BASE_IMAGE AS install_tools
+ARG DISTRO=ubuntu
+
+MAINTAINER Kasm Tech "info@kasmweb.com"
+LABEL "com.kasmweb.image"="true"
 
 ### Install common tools
 COPY ./src/ubuntu/install/tools $INST_SCRIPTS/tools/
@@ -13,9 +17,6 @@ RUN tar -xzf kasm-squid-builder_ubuntu.tar.gz -C /
 
 FROM install_tools
 
-MAINTAINER Kasm Tech "info@kasmweb.com"
-LABEL "com.kasmweb.image"="true"
-LABEL "com.kasmweb.gpu_acceleration_egl"="nvidia"
 
 ### Environment config
 ARG START_XFCE4=1
@@ -116,6 +117,10 @@ RUN rm -rf $INST_SCRIPTS/resources/
 RUN chmod +x /etc/squid/kasm_squid_adapter
 RUN chmod +x /etc/squid/start_squid.sh && chmod 4755 /etc/squid/start_squid.sh
 
+### Setup Container User - Libnss Wrapper
+COPY ./src/ubuntu/install/libnss $INST_SCRIPTS/libnss/
+RUN bash $INST_SCRIPTS/libnss/libnss_wrapper.sh  && rm -rf $INST_SCRIPTS/libnss/
+
 ### configure startup
 COPY ./src/common/scripts/kasm_hook_scripts $STARTUPDIR
 ADD ./src/common/startup_scripts $STARTUPDIR
@@ -124,13 +129,6 @@ RUN bash $STARTUPDIR/set_user_permission.sh $STARTUPDIR $HOME
 ### extra configurations needed per distro variant
 COPY ./src/ubuntu/install/extra $INST_SCRIPTS/extra/
 RUN bash $INST_SCRIPTS/extra/$EXTRA_SH  && rm -rf $INST_SCRIPTS/extra/
-
-### VirtualGL
-COPY ./src/ubuntu/install/virtualgl $INST_SCRIPTS/virtualgl/
-RUN bash $INST_SCRIPTS/virtualgl/install_virtualgl.sh && rm -rf $INST_SCRIPTS/virtualgl/
-RUN groupadd -g 1000 ubuntu \
-    && useradd -u 1000 -g 1000 -m ubuntu \
-    && usermod -a -G ubuntu ubuntu
 
 ENV HOME /home/kasm-user
 WORKDIR $HOME
@@ -159,7 +157,7 @@ RUN touch $STARTUPDIR/wm.log \
     && chown 1000:1000 $STARTUPDIR/kasmrx/Downloads \
     && chown -R root:root /usr/local/bin
 
-USER ubuntu
+USER 1000
 
 ENTRYPOINT ["/dockerstartup/kasm_default_profile.sh", "/dockerstartup/vnc_startup.sh", "/dockerstartup/kasm_startup.sh"]
 CMD ["--wait"]
